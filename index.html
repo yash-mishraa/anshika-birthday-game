@@ -376,30 +376,27 @@
                 birthdayVideo.pause(); birthdayVideo.currentTime = 0; birthdayVideo.muted = false;
             }).catch(e => console.log("Video prime fail:", e));
         }
+        
+        // Dedicated Mobile Audio Unlocker (Fires on ANY first touch)
+        window.addEventListener('touchstart', function() {
+            if (bgm.paused) {
+                primeMedia();
+            }
+        }, { once: true });
 
         function handleInput(e) {
-            // CRITICAL CHANGE FOR MOBILE AUDIO:
-            // If game is in START or GAMEOVER, we IGNORE 'touchstart'.
-            // We only respond to 'click' or 'keydown'. 
-            // This forces the user to complete a full "tap" (finger up), which fires 'click'.
-            // 'click' events are trusted by browsers to start audio. 'touchstart' is often blocked.
-            
-            if (e.type === 'touchstart' && (gameState === 'START' || gameState === 'GAMEOVER')) {
-                return; 
+            if (e.type === 'touchstart') {
+                e.preventDefault(); // Stop scrolling/zooming behavior
             }
             
-            // For Gameplay, we allow touchstart because it's faster/snappier for jumping
-            // but we don't need to prime media anymore (it's already done).
+            primeMedia(); // Ensure media is unlocked on this interaction
 
-            if (e.type === 'click' || e.code === 'Space' || (e.type === 'touchstart' && gameState === 'PLAYING')) {
-                // If this is the START/GAMEOVER click, prime the media
-                if (gameState === 'START' || gameState === 'GAMEOVER') {
-                    primeMedia();
-                    startGame();
-                } else if (gameState === 'PLAYING') {
-                    bird.jump();
-                }
+            if (gameState === 'START') {
+                startGame();
+            } else if (gameState === 'PLAYING') {
+                bird.jump();
             }
+            // If GAMEOVER, inputs are handled by the "Replay" button click
         }
 
         // Replay Button is an explicit click, so it's safe
@@ -408,12 +405,22 @@
         });
 
         // Listeners
-        window.addEventListener('keydown', handleInput);
-        window.addEventListener('mousedown', (e) => {
-             // Treat mousedown as a click starter if on desktop
-             if(gameState === 'PLAYING') bird.jump();
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                if(gameState === 'GAMEOVER' && replayBtn.style.display === 'block') {
+                    primeMedia();
+                    startGame();
+                } else {
+                    handleInput(e);
+                }
+            }
         });
-        window.addEventListener('click', handleInput);
+        
+        window.addEventListener('mousedown', (e) => {
+             // Treat mousedown as input if on desktop (avoid conflict with replay btn)
+             if(e.target !== replayBtn) handleInput(e);
+        });
+        
         window.addEventListener('touchstart', handleInput, {passive: false});
 
         init();
