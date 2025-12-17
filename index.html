@@ -136,12 +136,12 @@
 <body>
 
     <!-- Persistent Background Music -->
+    <!-- Added id and preload, user must interact to play -->
     <audio id="bgm" src="anshika.mp3" loop preload="auto"></audio>
 
-    <!-- Video Element (Replaces the game over text) -->
-    <!-- Ensure "anshikaaa.mp4" is in the same folder -->
-    <!-- Added webkit-playsinline for better iOS support -->
+    <!-- Video Element -->
     <video id="birthday-video" src="anshikaaa.mp4" playsinline webkit-playsinline></video>
+    
     <div id="replay-btn">Play Again</div>
 
     <canvas id="gameCanvas"></canvas>
@@ -151,10 +151,9 @@
         
         <div id="start-screen">
             <h1>Happy Birthday Anshika!</h1>
-            <p>Tap, Click, or Press Space to Fly</p>
+            <p>Tap to Start</p>
         </div>
         
-        <!-- Score is shown during gameplay -->
         <div class="score-display" id="score-counter">0</div>
     </div>
 
@@ -169,47 +168,36 @@
         const birthdayVideo = document.getElementById('birthday-video');
         const bgm = document.getElementById('bgm');
 
-        // Single Image Filename
         const birdImageSource = "anshika.jpg";
-
-        // Load Image
         const birdImg = new Image();
         birdImg.src = birdImageSource;
         birdImg.onerror = () => { console.log("Image failed to load:", birdImageSource); };
 
-        // Game State
-        let gameState = 'START'; // START, PLAYING, GAMEOVER
+        let gameState = 'START'; 
         let frames = 0;
         let score = 0;
         let bestScore = localStorage.getItem('anshika_flappy_best') || 0;
         bestScoreEl.innerText = bestScore;
 
-        let speed = 2.5; // Base speed
+        let speed = 2.5; 
         let gravity = 0.25;
         let jumpStrength = 6.5; 
-        let mediaPrimed = false; // Track if we've unlocked audio/video
+        let mediaPrimed = false;
 
-        // --- Resizing ---
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // Adjust ground level based on height
             ground.y = canvas.height - 50; 
         }
         window.addEventListener('resize', resize);
 
         // --- Game Objects ---
-
-        // Background Gradient Colors
         const bgColors = [
-            ['#FFDEE9', '#B5FFFC'], // Pink/Blue
-            ['#D4FC79', '#96E6A1'], // Greenish
-            ['#FDC830', '#F37335'], // Orange/Gold
-            ['#E0C3FC', '#8EC5FC']  // Purple/Blue
+            ['#FFDEE9', '#B5FFFC'], ['#D4FC79', '#96E6A1'], 
+            ['#FDC830', '#F37335'], ['#E0C3FC', '#8EC5FC']
         ];
         let currentBgIndex = 0;
 
-        // Confetti Particle System
         const confetti = [];
         class Particle {
             constructor() {
@@ -240,22 +228,11 @@
                 ctx.restore();
             }
         }
-
-        // Initialize Confetti
         for(let i=0; i<50; i++) confetti.push(new Particle());
 
-
         const bird = {
-            x: 50,
-            y: 150,
-            w: 54, // SIZE (Radius 27)
-            h: 54, 
-            velocity: 0,
-            radius: 27, 
-            rotation: 0,
-
+            x: 50, y: 150, w: 54, h: 54, velocity: 0, radius: 27, rotation: 0,
             draw: function() {
-                // Rotation based on velocity
                 if (this.velocity < 0) this.rotation = -25 * Math.PI / 180;
                 else if (this.velocity > 0) {
                     this.rotation += 2 * Math.PI / 180;
@@ -263,387 +240,183 @@
                 } else {
                     this.rotation = 0;
                 }
-
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.rotation);
-
-                // Draw Circle Mask
                 ctx.beginPath();
                 ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
                 ctx.closePath();
                 ctx.clip();
-
-                // Draw Image or Fallback
                 if (birdImg.complete && birdImg.naturalWidth !== 0) {
-                    // Draw image centered and scaled to cover
                     const aspect = birdImg.width / birdImg.height;
-                    let drawW = this.w;
-                    let drawH = this.h;
-                    if(aspect > 1) drawH = drawW / aspect; // wider
-                    else drawW = drawH * aspect; // taller
-                    
-                    // We actually want 'object-fit: cover' behavior
-                    const scale = Math.max(this.w / birdImg.width, this.h / birdImg.height);
-                    
+                    let drawW = this.w; let drawH = this.h;
+                    if(aspect > 1) drawH = drawW / aspect; else drawW = drawH * aspect;
                     ctx.drawImage(birdImg, -this.w/2, -this.h/2, this.w, this.h);
                 } else {
-                    // Fallback face
-                    ctx.fillStyle = '#FFD700';
-                    ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
-                    ctx.fillStyle = '#000';
-                    ctx.beginPath(); ctx.arc(-8, -5, 3, 0, Math.PI*2); ctx.fill();
-                    ctx.beginPath(); ctx.arc(8, -5, 3, 0, Math.PI*2); ctx.fill();
-                    ctx.beginPath(); ctx.arc(0, 5, 8, 0, Math.PI, false); ctx.stroke();
+                    ctx.fillStyle = '#FFD700'; ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
                 }
-
-                // Border ring
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 3;
-                ctx.stroke();
-
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
                 ctx.restore();
             },
-
-            jump: function() {
-                this.velocity = -jumpStrength;
-            },
-
+            jump: function() { this.velocity = -jumpStrength; },
             update: function() {
-                this.velocity += gravity;
-                this.y += this.velocity;
-
-                // Floor collision
-                if (this.y + this.radius >= ground.y) {
-                    this.y = ground.y - this.radius;
-                    gameOver();
-                }
-                
-                // Ceiling collision
-                if (this.y - this.radius <= 0) {
-                    this.y = 0 + this.radius;
-                    this.velocity = 0;
-                }
+                this.velocity += gravity; this.y += this.velocity;
+                if (this.y + this.radius >= ground.y) { this.y = ground.y - this.radius; gameOver(); }
+                if (this.y - this.radius <= 0) { this.y = 0 + this.radius; this.velocity = 0; }
             },
-            
             reset: function() {
-                this.x = canvas.width * 0.2; // 20% from left
-                this.y = canvas.height / 2;
-                this.velocity = 0;
-                this.rotation = 0;
+                this.x = canvas.width * 0.2; this.y = canvas.height / 2;
+                this.velocity = 0; this.rotation = 0;
             }
         };
 
         const pipes = {
-            items: [],
-            w: 50, 
-            gap: 220, 
-            dx: 2.5,
-
+            items: [], w: 50, gap: 220, dx: 2.5,
             draw: function() {
                 for (let i = 0; i < this.items.length; i++) {
                     let p = this.items[i];
-                    
-                    // Draw Candles (Pipes)
-                    this.drawCandle(p.x, 0, this.w, p.top, true); // Top pipe
-                    this.drawCandle(p.x, canvas.height - p.bottom, this.w, p.bottom, false); // Bottom pipe
+                    this.drawCandle(p.x, 0, this.w, p.top, true); 
+                    this.drawCandle(p.x, canvas.height - p.bottom, this.w, p.bottom, false);
                 }
             },
-
             drawCandle: function(x, y, w, h, isTop) {
-                // Candle Body (Striped)
-                ctx.fillStyle = '#FFC0CB'; // Pink base
-                ctx.fillRect(x, y, w, h);
-                
-                // Stripes
-                ctx.fillStyle = '#FF69B4'; // Darker pink stripes
-                ctx.beginPath();
-                for(let i = 0; i < h; i+=20) {
-                    ctx.fillRect(x, y + i, w, 10);
-                }
-
-                // Border
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x, y, w, h);
-
-                // Flame (Only on the 'tip' of the candle)
-                // If isTop, flame is at the bottom of the rect (y + h)
-                // If !isTop, flame is at the top of the rect (y)
+                ctx.fillStyle = '#FFC0CB'; ctx.fillRect(x, y, w, h);
+                ctx.fillStyle = '#FF69B4'; ctx.beginPath();
+                for(let i = 0; i < h; i+=20) ctx.fillRect(x, y + i, w, 10);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
                 let flameY = isTop ? y + h : y;
-                // Draw decorative cap
-                ctx.fillStyle = '#FFF';
-                ctx.fillRect(x - 5, flameY - 5, w + 10, 10);
+                ctx.fillStyle = '#FFF'; ctx.fillRect(x - 5, flameY - 5, w + 10, 10);
             },
-
             update: function() {
-                // Add new pipe
-                // Spacing logic: every 120 frames approx
                 if (frames % 120 === 0) {
-                    // Calculate random height
-                    // ground is at canvas.height - 50
-                    // max height available = ground.y
-                    // we need a gap. 
                     let availableHeight = ground.y - this.gap;
                     let topHeight = Math.random() * (availableHeight - 100) + 50;
                     let bottomHeight = availableHeight - topHeight;
-
-                    this.items.push({
-                        x: canvas.width,
-                        top: topHeight,
-                        bottom: bottomHeight,
-                        passed: false
-                    });
+                    this.items.push({ x: canvas.width, top: topHeight, bottom: bottomHeight, passed: false });
                 }
-
-                // Move pipes
                 for (let i = 0; i < this.items.length; i++) {
                     let p = this.items[i];
                     p.x -= this.dx;
-
-                    // Collision Logic
-                    // Simplified Box Collision
-                    // Bird is circle radius 27 at bird.x, bird.y
-                    // We check box overlap
-                    
-                    // Top Pipe Box
-                    if (
-                        bird.x + bird.radius - 5 > p.x && 
-                        bird.x - bird.radius + 5 < p.x + this.w && 
-                        bird.y - bird.radius + 5 < p.top
-                    ) {
-                        gameOver();
-                    }
-                    
-                    // Bottom Pipe Box
-                    if (
-                        bird.x + bird.radius - 5 > p.x && 
-                        bird.x - bird.radius + 5 < p.x + this.w && 
-                        bird.y + bird.radius - 5 > canvas.height - p.bottom
-                    ) {
-                        gameOver();
-                    }
-
-                    // Score Update
+                    if (bird.x + bird.radius - 5 > p.x && bird.x - bird.radius + 5 < p.x + this.w && bird.y - bird.radius + 5 < p.top) gameOver();
+                    if (bird.x + bird.radius - 5 > p.x && bird.x - bird.radius + 5 < p.x + this.w && bird.y + bird.radius - 5 > canvas.height - p.bottom) gameOver();
                     if (p.x + this.w < bird.x && !p.passed) {
-                        score++;
-                        scoreEl.innerText = score;
-                        p.passed = true;
-                        
-                        // Increase difficulty slightly
-                        if(score % 5 === 0) this.dx += 0.1; // Reduced speed increase
+                        score++; scoreEl.innerText = score; p.passed = true;
+                        if(score % 5 === 0) this.dx += 0.1;
                     }
-
-                    // Remove off-screen pipes
-                    if (p.x + this.w < 0) {
-                        this.items.shift();
-                        i--;
-                    }
+                    if (p.x + this.w < 0) { this.items.shift(); i--; }
                 }
             },
-
-            reset: function() {
-                this.items = [];
-                this.dx = speed;
-            }
+            reset: function() { this.items = []; this.dx = speed; }
         };
 
         const ground = {
-            y: 0, // Set in resize
+            y: 0,
             draw: function() {
-                ctx.fillStyle = '#8BC34A';
-                ctx.fillRect(0, this.y, canvas.width, canvas.height - this.y);
-                
-                // Grass details
-                ctx.strokeStyle = '#689F38';
-                ctx.beginPath();
-                ctx.moveTo(0, this.y);
-                ctx.lineTo(canvas.width, this.y);
-                ctx.stroke();
-                
-                // Decorative dots
-                ctx.fillStyle = '#DCEDC8';
-                for(let i=0; i<canvas.width; i+=40) {
-                    ctx.beginPath();
-                    ctx.arc(i + (frames % 40), this.y + 25, 5, 0, Math.PI*2);
-                    ctx.fill();
-                }
+                ctx.fillStyle = '#8BC34A'; ctx.fillRect(0, this.y, canvas.width, canvas.height - this.y);
+                ctx.strokeStyle = '#689F38'; ctx.beginPath(); ctx.moveTo(0, this.y); ctx.lineTo(canvas.width, this.y); ctx.stroke();
             }
         };
 
-        // --- Core Functions ---
-
-        function init() {
-            resize();
-            bird.reset();
-            scoreEl.style.display = 'none';
-            loop();
-        }
+        function init() { resize(); bird.reset(); scoreEl.style.display = 'none'; loop(); }
 
         function startGame() {
             if (gameState === 'PLAYING') return;
-            
-            // UI Reset
             gameState = 'PLAYING';
-            score = 0;
-            scoreEl.innerText = score;
-            startScreen.style.display = 'none';
-            scoreEl.style.display = 'block';
-            
-            // Hide Video & Button
-            birthdayVideo.style.display = 'none';
-            birthdayVideo.pause();
-            birthdayVideo.currentTime = 0;
-            replayBtn.style.display = 'none';
-
-            // Random background color for this run
+            score = 0; scoreEl.innerText = score;
+            startScreen.style.display = 'none'; scoreEl.style.display = 'block';
+            birthdayVideo.style.display = 'none'; birthdayVideo.pause(); birthdayVideo.currentTime = 0; replayBtn.style.display = 'none';
             currentBgIndex = Math.floor(Math.random() * bgColors.length);
-
-            bird.reset();
-            pipes.reset();
-            frames = 0;
-            
-            bird.jump();
+            bird.reset(); pipes.reset(); frames = 0; bird.jump();
         }
 
         function gameOver() {
             if(gameState === 'GAMEOVER') return;
             gameState = 'GAMEOVER';
             scoreEl.style.display = 'none';
-
-            // Check Best Score
             if(score > bestScore) {
-                bestScore = score;
-                localStorage.setItem('anshika_flappy_best', bestScore);
-                bestScoreEl.innerText = bestScore;
+                bestScore = score; localStorage.setItem('anshika_flappy_best', bestScore); bestScoreEl.innerText = bestScore;
             }
-
-            // Show Video
             birthdayVideo.style.display = 'block';
-            // Unmute just in case it was muted during priming
             birthdayVideo.muted = false; 
-            
             birthdayVideo.play().catch(e => {
-                console.log("Video play failed:", e);
-                // If autoplay fails, we show the replay button immediately
-                replayBtn.style.display = 'block';
+                console.log("Video play failed:", e); replayBtn.style.display = 'block';
             });
-            
-            // Show replay button after a short delay (so they don't accidentally click it immediately)
-            setTimeout(() => {
-                replayBtn.style.display = 'block';
-            }, 2000);
+            setTimeout(() => { replayBtn.style.display = 'block'; }, 2000);
         }
 
         function update() {
-            // Update Confetti
             confetti.forEach(p => p.update());
-
-            if (gameState === 'PLAYING') {
-                bird.update();
-                pipes.update();
-                frames++;
-            } else if (gameState === 'GAMEOVER') {
-                // Bird falls to ground
-                if(bird.y + bird.radius < ground.y) {
-                    bird.y += 10;
-                    bird.rotation += 10 * Math.PI / 180;
-                }
+            if (gameState === 'PLAYING') { bird.update(); pipes.update(); frames++; }
+            else if (gameState === 'GAMEOVER') {
+                if(bird.y + bird.radius < ground.y) { bird.y += 10; bird.rotation += 10 * Math.PI / 180; }
             }
         }
 
         function draw() {
-            // Clear
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Background Gradient
             const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            grad.addColorStop(0, bgColors[currentBgIndex][0]);
-            grad.addColorStop(1, bgColors[currentBgIndex][1]);
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Confetti (Behind pipes)
+            grad.addColorStop(0, bgColors[currentBgIndex][0]); grad.addColorStop(1, bgColors[currentBgIndex][1]);
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
             confetti.forEach(p => p.draw());
-
-            // Draw Game Elements
-            pipes.draw();
-            ground.draw();
-            bird.draw();
+            pipes.draw(); ground.draw(); bird.draw();
         }
 
-        function loop() {
-            update();
-            draw();
-            requestAnimationFrame(loop);
-        }
+        function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-        // --- Input Handling ---
-        
-        // Function to Prime Audio/Video on first interaction
+        // --- IMPROVED INPUT & MEDIA HANDLING ---
+
         function primeMedia() {
             if (mediaPrimed) return;
             mediaPrimed = true;
-
-            // 1. Play Background Music
-            bgm.play().catch(e => console.log("BGM start failed:", e));
-
-            // 2. Prime Video (Play muted then immediately pause)
-            // This "authorizes" the video element so we can play it freely later
+            // Play Audio
+            bgm.play().catch(e => console.log("BGM fail:", e));
+            // Prime Video
             birthdayVideo.muted = true; 
-            const playPromise = birthdayVideo.play();
-            if (playPromise !== undefined) {
-                playPromise.then(_ => {
-                    birthdayVideo.pause();
-                    birthdayVideo.currentTime = 0;
-                    birthdayVideo.muted = false; // Prepare for real playback
-                })
-                .catch(error => {
-                    console.log("Video priming failed:", error);
-                });
-            }
+            birthdayVideo.play().then(() => {
+                birthdayVideo.pause(); birthdayVideo.currentTime = 0; birthdayVideo.muted = false;
+            }).catch(e => console.log("Video prime fail:", e));
         }
 
         function handleInput(e) {
-            // Prevent default behavior (scrolling, zooming)
-            if(e.type === 'touchstart' || e.key === ' ') {
-               // e.preventDefault(); 
+            // CRITICAL CHANGE FOR MOBILE AUDIO:
+            // If game is in START or GAMEOVER, we IGNORE 'touchstart'.
+            // We only respond to 'click' or 'keydown'. 
+            // This forces the user to complete a full "tap" (finger up), which fires 'click'.
+            // 'click' events are trusted by browsers to start audio. 'touchstart' is often blocked.
+            
+            if (e.type === 'touchstart' && (gameState === 'START' || gameState === 'GAMEOVER')) {
+                return; 
             }
+            
+            // For Gameplay, we allow touchstart because it's faster/snappier for jumping
+            // but we don't need to prime media anymore (it's already done).
 
-            // Always attempt to prime media on any interaction
-            primeMedia();
-
-            if (gameState === 'START') {
-                startGame();
-            } else if (gameState === 'PLAYING') {
-                bird.jump();
-            }
-            // If GAMEOVER, inputs are handled by the "Replay" button click
-        }
-
-        // Replay Button Click
-        replayBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent triggering canvas click
-            primeMedia(); // Just in case
-            startGame();
-        });
-
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                if(gameState === 'GAMEOVER' && replayBtn.style.display === 'block') {
+            if (e.type === 'click' || e.code === 'Space' || (e.type === 'touchstart' && gameState === 'PLAYING')) {
+                // If this is the START/GAMEOVER click, prime the media
+                if (gameState === 'START' || gameState === 'GAMEOVER') {
+                    primeMedia();
                     startGame();
-                } else {
-                    handleInput(e);
+                } else if (gameState === 'PLAYING') {
+                    bird.jump();
                 }
             }
+        }
+
+        // Replay Button is an explicit click, so it's safe
+        replayBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); primeMedia(); startGame();
         });
-        
-        window.addEventListener('mousedown', handleInput);
+
+        // Listeners
+        window.addEventListener('keydown', handleInput);
+        window.addEventListener('mousedown', (e) => {
+             // Treat mousedown as a click starter if on desktop
+             if(gameState === 'PLAYING') bird.jump();
+        });
+        window.addEventListener('click', handleInput);
         window.addEventListener('touchstart', handleInput, {passive: false});
 
-        // Start
         init();
-
     </script>
 </body>
 </html>
