@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Happy Birthday Anshika!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Pacifico&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #333;
+            font-family: 'Fredoka One', cursive;
+            touch-action: none; /* Prevent scrolling on mobile */
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+            /* Fallback gradient if JS fails */
+            background: linear-gradient(to bottom, #87CEEB, #E0F6FF); 
+        }
+
+        /* Hidden assets */
+        #assets {
+            display: none;
+        }
+
+        /* Overlay for UI messages */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        /* Birthday Video Styling */
+        #birthday-video {
+            display: none; /* Hidden by default */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 20;
+            background: black;
+        }
+
+        /* Replay Button (appears over video) */
+        #replay-btn {
+            display: none;
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.5rem;
+            background-color: #ff4081;
+            color: white;
+            border: 4px solid white;
+            border-radius: 50px;
+            cursor: pointer;
+            z-index: 30;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            pointer-events: auto; /* Enable clicking */
+        }
+        #replay-btn:hover {
+            background-color: #ff80ab;
+            transform: translateX(-50%) scale(1.05);
+        }
+
+        h1 {
+            font-family: 'Pacifico', cursive;
+            font-size: 3rem;
+            color: #ff4081;
+            margin: 0;
+            padding: 10px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        p {
+            font-size: 1.5rem;
+            color: white;
+            margin: 10px;
+        }
+
+        .score-display {
+            position: absolute;
+            top: 10%;
+            font-size: 4rem;
+            color: white;
+            z-index: 10;
+        }
+
+        .best-score-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 1.5rem;
+            color: #FFD700; /* Gold color */
+            z-index: 10;
+            text-shadow: 2px 2px 2px rgba(0,0,0,0.5);
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 600px) {
+            h1 { font-size: 2.5rem; }
+            p { font-size: 1.2rem; }
+            .best-score-display { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Persistent Background Music -->
+    <audio id="bgm" src="anshika.mp3" loop preload="auto"></audio>
+
+    <!-- Video Element (Replaces the game over text) -->
+    <!-- Ensure "anshikaaa.mp4" is in the same folder -->
+    <video id="birthday-video" src="anshikaaa.mp4" playsinline></video>
+    <div id="replay-btn">Play Again</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="best-score-display">Best: <span id="best-score-val">0</span></div>
+        
+        <div id="start-screen">
+            <h1>Happy Birthday Anshika!</h1>
+            <p>Tap, Click, or Press Space to Fly</p>
+        </div>
+        
+        <!-- Score is shown during gameplay -->
+        <div class="score-display" id="score-counter">0</div>
+    </div>
+
+    <script>
+        // --- Configuration & Assets ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score-counter');
+        const bestScoreEl = document.getElementById('best-score-val');
+        const startScreen = document.getElementById('start-screen');
+        const replayBtn = document.getElementById('replay-btn');
+        const birthdayVideo = document.getElementById('birthday-video');
+        const bgm = document.getElementById('bgm');
+
+        // Single Image Filename
+        const birdImageSource = "anshika.jpg";
+
+        // Load Image
+        const birdImg = new Image();
+        birdImg.src = birdImageSource;
+        birdImg.onerror = () => { console.log("Image failed to load:", birdImageSource); };
+
+        // Game State
+        let gameState = 'START'; // START, PLAYING, GAMEOVER
+        let frames = 0;
+        let score = 0;
+        let bestScore = localStorage.getItem('anshika_flappy_best') || 0;
+        bestScoreEl.innerText = bestScore;
+
+        let speed = 2.5; // Base speed
+        let gravity = 0.25;
+        let jumpStrength = 6.5; 
+        let musicStarted = false;
+
+        // --- Resizing ---
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Adjust ground level based on height
+            ground.y = canvas.height - 50; 
+        }
+        window.addEventListener('resize', resize);
+
+        // --- Game Objects ---
+
+        // Background Gradient Colors
+        const bgColors = [
+            ['#FFDEE9', '#B5FFFC'], // Pink/Blue
+            ['#D4FC79', '#96E6A1'], // Greenish
+            ['#FDC830', '#F37335'], // Orange/Gold
+            ['#E0C3FC', '#8EC5FC']  // Purple/Blue
+        ];
+        let currentBgIndex = 0;
+
+        // Confetti Particle System
+        const confetti = [];
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height - canvas.height;
+                this.size = Math.random() * 8 + 4;
+                this.speedY = Math.random() * 2 + 1;
+                this.speedX = Math.random() * 2 - 1;
+                this.color = `hsl(${Math.random() * 360}, 100%, 70%)`;
+                this.rotation = Math.random() * 360;
+                this.rotationSpeed = Math.random() * 5 - 2.5;
+            }
+            update() {
+                this.y += this.speedY;
+                this.x += this.speedX;
+                this.rotation += this.rotationSpeed;
+                if (this.y > canvas.height) {
+                    this.y = -10;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation * Math.PI / 180);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        // Initialize Confetti
+        for(let i=0; i<50; i++) confetti.push(new Particle());
+
+
+        const bird = {
+            x: 50,
+            y: 150,
+            w: 54, // INCREASED SIZE to be more visible (Radius 27)
+            h: 54, 
+            velocity: 0,
+            radius: 27, 
+            rotation: 0,
+
+            draw: function() {
+                // Rotation based on velocity
+                if (this.velocity < 0) this.rotation = -25 * Math.PI / 180;
+                else if (this.velocity > 0) {
+                    this.rotation += 2 * Math.PI / 180;
+                    if(this.rotation > 90 * Math.PI / 180) this.rotation = 90 * Math.PI / 180;
+                } else {
+                    this.rotation = 0;
+                }
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+
+                // Draw Circle Mask
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+
+                // Draw Image or Fallback
+                if (birdImg.complete && birdImg.naturalWidth !== 0) {
+                    // Draw image centered and scaled to cover
+                    const aspect = birdImg.width / birdImg.height;
+                    let drawW = this.w;
+                    let drawH = this.h;
+                    if(aspect > 1) drawH = drawW / aspect; // wider
+                    else drawW = drawH * aspect; // taller
+                    
+                    // We actually want 'object-fit: cover' behavior
+                    const scale = Math.max(this.w / birdImg.width, this.h / birdImg.height);
+                    
+                    ctx.drawImage(birdImg, -this.w/2, -this.h/2, this.w, this.h);
+                } else {
+                    // Fallback face
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(-8, -5, 3, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -5, 3, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(0, 5, 8, 0, Math.PI, false); ctx.stroke();
+                }
+
+                // Border ring
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.restore();
+            },
+
+            jump: function() {
+                this.velocity = -jumpStrength;
+            },
+
+            update: function() {
+                this.velocity += gravity;
+                this.y += this.velocity;
+
+                // Floor collision
+                if (this.y + this.radius >= ground.y) {
+                    this.y = ground.y - this.radius;
+                    gameOver();
+                }
+                
+                // Ceiling collision
+                if (this.y - this.radius <= 0) {
+                    this.y = 0 + this.radius;
+                    this.velocity = 0;
+                }
+            },
+            
+            reset: function() {
+                this.x = canvas.width * 0.2; // 20% from left
+                this.y = canvas.height / 2;
+                this.velocity = 0;
+                this.rotation = 0;
+            }
+        };
+
+        const pipes = {
+            items: [],
+            w: 50, // DECREASED WIDTH for better balance (was 60)
+            gap: 220, 
+            dx: 2.5,
+
+            draw: function() {
+                for (let i = 0; i < this.items.length; i++) {
+                    let p = this.items[i];
+                    
+                    // Draw Candles (Pipes)
+                    this.drawCandle(p.x, 0, this.w, p.top, true); // Top pipe
+                    this.drawCandle(p.x, canvas.height - p.bottom, this.w, p.bottom, false); // Bottom pipe
+                }
+            },
+
+            drawCandle: function(x, y, w, h, isTop) {
+                // Candle Body (Striped)
+                ctx.fillStyle = '#FFC0CB'; // Pink base
+                ctx.fillRect(x, y, w, h);
+                
+                // Stripes
+                ctx.fillStyle = '#FF69B4'; // Darker pink stripes
+                ctx.beginPath();
+                for(let i = 0; i < h; i+=20) {
+                    ctx.fillRect(x, y + i, w, 10);
+                }
+
+                // Border
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, w, h);
+
+                // Flame (Only on the 'tip' of the candle)
+                // If isTop, flame is at the bottom of the rect (y + h)
+                // If !isTop, flame is at the top of the rect (y)
+                let flameY = isTop ? y + h : y;
+                // Draw decorative cap
+                ctx.fillStyle = '#FFF';
+                ctx.fillRect(x - 5, flameY - 5, w + 10, 10);
+            },
+
+            update: function() {
+                // Add new pipe
+                // Spacing logic: every 120 frames approx
+                if (frames % 120 === 0) {
+                    // Calculate random height
+                    // ground is at canvas.height - 50
+                    // max height available = ground.y
+                    // we need a gap. 
+                    let availableHeight = ground.y - this.gap;
+                    let topHeight = Math.random() * (availableHeight - 100) + 50;
+                    let bottomHeight = availableHeight - topHeight;
+
+                    this.items.push({
+                        x: canvas.width,
+                        top: topHeight,
+                        bottom: bottomHeight,
+                        passed: false
+                    });
+                }
+
+                // Move pipes
+                for (let i = 0; i < this.items.length; i++) {
+                    let p = this.items[i];
+                    p.x -= this.dx;
+
+                    // Collision Logic
+                    // Simplified Box Collision
+                    // Bird is circle radius 27 at bird.x, bird.y
+                    // We check box overlap
+                    
+                    // Top Pipe Box
+                    if (
+                        bird.x + bird.radius - 5 > p.x && 
+                        bird.x - bird.radius + 5 < p.x + this.w && 
+                        bird.y - bird.radius + 5 < p.top
+                    ) {
+                        gameOver();
+                    }
+                    
+                    // Bottom Pipe Box
+                    if (
+                        bird.x + bird.radius - 5 > p.x && 
+                        bird.x - bird.radius + 5 < p.x + this.w && 
+                        bird.y + bird.radius - 5 > canvas.height - p.bottom
+                    ) {
+                        gameOver();
+                    }
+
+                    // Score Update
+                    if (p.x + this.w < bird.x && !p.passed) {
+                        score++;
+                        scoreEl.innerText = score;
+                        p.passed = true;
+                        
+                        // Increase difficulty slightly
+                        if(score % 5 === 0) this.dx += 0.1; // Reduced speed increase
+                    }
+
+                    // Remove off-screen pipes
+                    if (p.x + this.w < 0) {
+                        this.items.shift();
+                        i--;
+                    }
+                }
+            },
+
+            reset: function() {
+                this.items = [];
+                this.dx = speed;
+            }
+        };
+
+        const ground = {
+            y: 0, // Set in resize
+            draw: function() {
+                ctx.fillStyle = '#8BC34A';
+                ctx.fillRect(0, this.y, canvas.width, canvas.height - this.y);
+                
+                // Grass details
+                ctx.strokeStyle = '#689F38';
+                ctx.beginPath();
+                ctx.moveTo(0, this.y);
+                ctx.lineTo(canvas.width, this.y);
+                ctx.stroke();
+                
+                // Decorative dots
+                ctx.fillStyle = '#DCEDC8';
+                for(let i=0; i<canvas.width; i+=40) {
+                    ctx.beginPath();
+                    ctx.arc(i + (frames % 40), this.y + 25, 5, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+        };
+
+        // --- Core Functions ---
+
+        function init() {
+            resize();
+            bird.reset();
+            scoreEl.style.display = 'none';
+            loop();
+        }
+
+        function startGame() {
+            if (gameState === 'PLAYING') return;
+            
+            // UI Reset
+            gameState = 'PLAYING';
+            score = 0;
+            scoreEl.innerText = score;
+            startScreen.style.display = 'none';
+            scoreEl.style.display = 'block';
+            
+            // Hide Video & Button
+            birthdayVideo.style.display = 'none';
+            birthdayVideo.pause();
+            birthdayVideo.currentTime = 0;
+            replayBtn.style.display = 'none';
+
+            // Random background color for this run
+            currentBgIndex = Math.floor(Math.random() * bgColors.length);
+
+            bird.reset();
+            pipes.reset();
+            frames = 0;
+            
+            bird.jump();
+        }
+
+        function gameOver() {
+            if(gameState === 'GAMEOVER') return;
+            gameState = 'GAMEOVER';
+            scoreEl.style.display = 'none';
+
+            // Check Best Score
+            if(score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('anshika_flappy_best', bestScore);
+                bestScoreEl.innerText = bestScore;
+            }
+
+            // Show Video
+            birthdayVideo.style.display = 'block';
+            birthdayVideo.play().catch(e => {
+                console.log("Video play failed:", e);
+                // If autoplay fails, we show the replay button immediately
+                replayBtn.style.display = 'block';
+            });
+            
+            // Show replay button after a short delay (so they don't accidentally click it immediately)
+            setTimeout(() => {
+                replayBtn.style.display = 'block';
+            }, 2000);
+        }
+
+        function update() {
+            // Update Confetti
+            confetti.forEach(p => p.update());
+
+            if (gameState === 'PLAYING') {
+                bird.update();
+                pipes.update();
+                frames++;
+            } else if (gameState === 'GAMEOVER') {
+                // Bird falls to ground
+                if(bird.y + bird.radius < ground.y) {
+                    bird.y += 10;
+                    bird.rotation += 10 * Math.PI / 180;
+                }
+            }
+        }
+
+        function draw() {
+            // Clear
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Background Gradient
+            const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, bgColors[currentBgIndex][0]);
+            grad.addColorStop(1, bgColors[currentBgIndex][1]);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Confetti (Behind pipes)
+            confetti.forEach(p => p.draw());
+
+            // Draw Game Elements
+            pipes.draw();
+            ground.draw();
+            bird.draw();
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Input Handling ---
+
+        function handleInput(e) {
+            // Prevent default behavior (scrolling, zooming)
+            if(e.type === 'touchstart' || e.key === ' ') {
+               // e.preventDefault(); 
+            }
+
+            // Start music on first interaction (if not already playing)
+            if (!musicStarted) {
+                bgm.play().catch(e => console.log("Audio play failed:", e));
+                musicStarted = true;
+            }
+
+            if (gameState === 'START') {
+                startGame();
+            } else if (gameState === 'PLAYING') {
+                bird.jump();
+            }
+            // If GAMEOVER, inputs are handled by the "Replay" button click
+        }
+
+        // Replay Button Click
+        replayBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering canvas click
+            startGame();
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                if(gameState === 'GAMEOVER' && replayBtn.style.display === 'block') {
+                    startGame();
+                } else {
+                    handleInput(e);
+                }
+            }
+        });
+        
+        window.addEventListener('mousedown', handleInput);
+        window.addEventListener('touchstart', handleInput, {passive: false});
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>
