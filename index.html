@@ -150,8 +150,8 @@
 <body>
 
     <!-- Persistent Background Music -->
-    <!-- Added id and preload, user must interact to play -->
-    <audio id="bgm" src="anshika.mp3" loop preload="auto"></audio>
+    <!-- Added id, preload, and autoplay to try forcing audio on load -->
+    <audio id="bgm" src="anshika.mp3" loop preload="auto" autoplay></audio>
     
     <!-- Crash Sound (Obstacle) -->
     <audio id="crash-sound" src="obstacle.mp3" preload="auto"></audio>
@@ -343,7 +343,23 @@
             }
         };
 
-        function init() { resize(); bird.reset(); scoreEl.style.display = 'none'; loop(); }
+        function init() { 
+            resize(); 
+            bird.reset(); 
+            scoreEl.style.display = 'none'; 
+            loop(); 
+
+            // Attempt to autoplay audio on load
+            var promise = bgm.play();
+            if (promise !== undefined) {
+                promise.then(_ => {
+                    isAudioUnlocked = true;
+                    console.log("Autoplay success");
+                }).catch(error => {
+                    console.log("Autoplay prevented. Waiting for interaction.");
+                });
+            }
+        }
 
         function startGame() {
             if (gameState === 'PLAYING') return;
@@ -501,6 +517,13 @@
         });
         
         window.addEventListener('touchstart', handleInput, {passive: false});
+        
+        // DEDICATED MOBILE AUDIO UNLOCKER (Fixes the variable name bug)
+        window.addEventListener('touchstart', function() {
+            if (bgm.paused) {
+                unlockAudio();
+            }
+        }, { once: true });
 
         init();
     </script>
