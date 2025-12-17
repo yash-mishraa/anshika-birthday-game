@@ -62,14 +62,27 @@
             background-color: black; /* Black bars for fitting */
         }
 
+        /* Loading Spinner for Video */
+        #video-loader {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 250;
+            color: white;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
         /* Replay Button (appears over video) */
         #replay-btn {
             display: none;
-            position: absolute;
-            bottom: 30px; /* Position from bottom */
+            position: fixed; /* Changed to fixed to stay on top of video */
+            bottom: 50px; /* Position from bottom */
             left: 50%;
             transform: translateX(-50%);
-            padding: 15px 30px;
+            padding: 15px 40px; /* Larger touch target */
             font-family: 'Fredoka One', cursive;
             font-size: 1.5rem;
             background-color: #ff4081;
@@ -77,13 +90,14 @@
             border: 4px solid white;
             border-radius: 50px;
             cursor: pointer;
-            z-index: 300;
+            z-index: 1000; /* Super high z-index */
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             pointer-events: auto; /* Enable clicking */
+            -webkit-tap-highlight-color: transparent;
         }
-        #replay-btn:hover {
-            background-color: #ff80ab;
-            transform: translateX(-50%) scale(1.05);
+        #replay-btn:active {
+            transform: translateX(-50%) scale(0.95);
+            background-color: #f50057;
         }
 
         h1 {
@@ -145,6 +159,7 @@
     <!-- Video Element -->
     <!-- Added preload="auto" to help with lag -->
     <video id="birthday-video" src="anshikaaa.mp4" playsinline webkit-playsinline preload="auto"></video>
+    <div id="video-loader">Loading Video...</div>
     
     <div id="replay-btn">Play Again</div>
 
@@ -170,6 +185,7 @@
         const startScreen = document.getElementById('start-screen');
         const replayBtn = document.getElementById('replay-btn');
         const birthdayVideo = document.getElementById('birthday-video');
+        const videoLoader = document.getElementById('video-loader');
         const bgm = document.getElementById('bgm');
         const crashSound = document.getElementById('crash-sound');
 
@@ -191,9 +207,8 @@
         let speed = 2.5; 
         let gravity = 0.25;
         let jumpStrength = 6.5; 
-        let mediaPrimed = false;
         let loopId = null; // To manage the game loop
-        let isVideoPlaying = false; // To optimize performance
+        let isAudioUnlocked = false; // Flag for mobile audio
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -333,11 +348,20 @@
         function startGame() {
             if (gameState === 'PLAYING') return;
             gameState = 'PLAYING';
-            isVideoPlaying = false; // Resume game loop rendering
             
+            // Hide video elements
+            birthdayVideo.style.display = 'none'; 
+            birthdayVideo.pause(); 
+            birthdayVideo.currentTime = 0; 
+            videoLoader.style.display = 'none';
+            replayBtn.style.display = 'none';
+            
+            // Show Game Canvas
+            canvas.style.display = 'block';
+
             score = 0; scoreEl.innerText = score;
             startScreen.style.display = 'none'; scoreEl.style.display = 'block';
-            birthdayVideo.style.display = 'none'; birthdayVideo.pause(); birthdayVideo.currentTime = 0; replayBtn.style.display = 'none';
+            
             currentBgIndex = Math.floor(Math.random() * bgColors.length);
             bird.reset(); pipes.reset(); frames = 0; bird.jump();
             
@@ -352,22 +376,45 @@
             // Play crash sound
             crashSound.currentTime = 0;
             crashSound.volume = 1.0; 
-            crashSound.play().catch(e => console.log("Crash sound play failed in gameOver:", e));
+            crashSound.play().catch(e => console.log("Crash sound error:", e));
 
             if(score > bestScore) {
                 bestScore = score; localStorage.setItem('anshika_flappy_best', bestScore); bestScoreEl.innerText = bestScore;
             }
             
+            // VIDEO HANDLING OPTIMIZATION
+            // 1. Show loader
+            videoLoader.style.display = 'block';
             birthdayVideo.style.display = 'block';
+            
+            // 2. Hide Canvas to save resources (Fixes lag)
+            canvas.style.display = 'none';
+            
+            // 3. Stop Game Loop
+            if(loopId) {
+                cancelAnimationFrame(loopId);
+                loopId = null;
+            }
+
+            // 4. Play Video
             birthdayVideo.muted = false; 
+            var playPromise = birthdayVideo.play();
             
-            // Optimization: Set flag to stop canvas rendering loop to help mobile CPU
-            isVideoPlaying = true; 
+            if (playPromise !== undefined) {
+                playPromise.then(_ => {
+                    // Playback started
+                    videoLoader.style.display = 'none';
+                })
+                .catch(error => {
+                    console.log("Video play error:", error);
+                    videoLoader.style.display = 'none';
+                });
+            }
             
-            birthdayVideo.play().catch(e => {
-                console.log("Video play failed:", e); replayBtn.style.display = 'block';
-            });
-            setTimeout(() => { replayBtn.style.display = 'block'; }, 2000);
+            // Show replay button shortly after
+            setTimeout(() => { 
+                replayBtn.style.display = 'block'; 
+            }, 2000);
         }
 
         function update() {
@@ -388,59 +435,37 @@
         }
 
         function loop() { 
-            // If video is playing, stop rendering the game to save resources (fixes lag)
-            if (isVideoPlaying) {
-                // We don't request next frame, essentially pausing the canvas
-                // But we allow one last draw or similar if needed. 
-                // Actually, just returning here stops the loop.
-                loopId = null; 
-                return; 
-            }
-            
             update(); 
             draw(); 
             loopId = requestAnimationFrame(loop); 
         }
 
-        // --- IMPROVED INPUT & MEDIA HANDLING ---
-
-        function primeMedia() {
-            if (mediaPrimed) return;
-            mediaPrimed = true;
-            // Play Audio
-            bgm.play().catch(e => console.log("BGM fail:", e));
+        // --- GLOBAL AUDIO UNLOCKER ---
+        // This runs EXACTLY once on the very first touch/click anywhere on the screen
+        function unlockAudio() {
+            if(isAudioUnlocked) return;
+            isAudioUnlocked = true;
             
-            // Prime Crash Sound
-            crashSound.volume = 0;
-            crashSound.play().then(() => {
-                crashSound.pause(); 
-                crashSound.currentTime = 0; 
-                crashSound.volume = 1.0; 
-            }).catch(e => console.log("Crash prime fail:", e));
+            // 1. Start Background Music
+            bgm.play().then(() => {
+                console.log("Audio unlocked successfully");
+            }).catch(e => console.log("Audio unlock failed", e));
 
-            // Prime Video
-            birthdayVideo.muted = true; 
-            birthdayVideo.play().then(() => {
-                birthdayVideo.pause(); birthdayVideo.currentTime = 0; birthdayVideo.muted = false;
-            }).catch(e => console.log("Video prime fail:", e));
+            // 2. Prime other sounds (mute, play, pause)
+            crashSound.play().then(() => { crashSound.pause(); crashSound.currentTime=0; }).catch(()=>{});
+            birthdayVideo.play().then(() => { birthdayVideo.pause(); birthdayVideo.currentTime=0; }).catch(()=>{});
         }
-        
-        // Dedicated Mobile Audio Unlocker (Fires on ANY first touch)
-        window.addEventListener('touchstart', function() {
-            if (bgm.paused) {
-                primeMedia();
-            }
-        }, { once: true });
+
+        // --- INPUT HANDLING ---
 
         function handleInput(e) {
-            // Check if user clicked the Replay Button (handled separately now)
+            // If clicking replay button, ignore this handler (it has its own)
             if (e.target === replayBtn) return;
 
-            if (e.type === 'touchstart') {
-                e.preventDefault(); // Stop scrolling/zooming behavior
-            }
+            if (e.type === 'touchstart') e.preventDefault();
             
-            primeMedia(); 
+            // Attempt to unlock audio on interaction
+            unlockAudio();
 
             if (gameState === 'START') {
                 startGame();
@@ -449,26 +474,22 @@
             }
         }
 
-        // REPLAY BUTTON: Dedicated Listener for reliability on mobile
-        replayBtn.addEventListener('touchstart', (e) => {
-            e.stopPropagation(); // Stop bubbling
-            e.preventDefault();  // Stop double-firing or default touch actions
-            primeMedia(); 
+        // Button Listener - Using touchend for reliability
+        function handleReplay(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            unlockAudio(); // Just in case
             startGame();
-        }, {passive: false});
+        }
+        
+        replayBtn.addEventListener('touchend', handleReplay);
+        replayBtn.addEventListener('click', handleReplay);
 
-        replayBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); 
-            primeMedia(); 
-            startGame();
-        });
-
-        // Listeners
+        // Global Listeners
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space') {
                 if(gameState === 'GAMEOVER' && replayBtn.style.display === 'block') {
-                    primeMedia();
-                    startGame();
+                    handleReplay(e);
                 } else {
                     handleInput(e);
                 }
