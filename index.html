@@ -138,6 +138,9 @@
     <!-- Persistent Background Music -->
     <!-- Added id and preload, user must interact to play -->
     <audio id="bgm" src="anshika.mp3" loop preload="auto"></audio>
+    
+    <!-- Crash Sound (Obstacle) -->
+    <audio id="crash-sound" src="obstacle.mp3" preload="auto"></audio>
 
     <!-- Video Element -->
     <video id="birthday-video" src="anshikaaa.mp4" playsinline webkit-playsinline></video>
@@ -167,6 +170,7 @@
         const replayBtn = document.getElementById('replay-btn');
         const birthdayVideo = document.getElementById('birthday-video');
         const bgm = document.getElementById('bgm');
+        const crashSound = document.getElementById('crash-sound');
 
         const birdImageSource = "anshika.jpg";
         const birdImg = new Image();
@@ -333,6 +337,11 @@
             if(gameState === 'GAMEOVER') return;
             gameState = 'GAMEOVER';
             scoreEl.style.display = 'none';
+            
+            // Play crash sound
+            crashSound.currentTime = 0;
+            crashSound.play().catch(e => console.log("Crash sound play failed:", e));
+
             if(score > bestScore) {
                 bestScore = score; localStorage.setItem('anshika_flappy_best', bestScore); bestScoreEl.innerText = bestScore;
             }
@@ -370,6 +379,13 @@
             mediaPrimed = true;
             // Play Audio
             bgm.play().catch(e => console.log("BGM fail:", e));
+            
+            // Prime Crash Sound (Mute, play, pause)
+            crashSound.muted = true;
+            crashSound.play().then(() => {
+                crashSound.pause(); crashSound.currentTime = 0; crashSound.muted = false;
+            }).catch(e => console.log("Crash prime fail:", e));
+
             // Prime Video
             birthdayVideo.muted = true; 
             birthdayVideo.play().then(() => {
