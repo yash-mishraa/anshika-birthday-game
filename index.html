@@ -172,6 +172,10 @@
         const bgm = document.getElementById('bgm');
         const crashSound = document.getElementById('crash-sound');
 
+        // --- VOLUME SETTINGS ---
+        bgm.volume = 0.6; // Reduced by 40% (0.6)
+        crashSound.volume = 1.0; // Keep crash sound loud
+
         const birdImageSource = "anshika.jpg";
         const birdImg = new Image();
         birdImg.src = birdImageSource;
@@ -340,7 +344,9 @@
             
             // Play crash sound
             crashSound.currentTime = 0;
-            crashSound.play().catch(e => console.log("Crash sound play failed:", e));
+            // Ensure volume is up
+            crashSound.volume = 1.0; 
+            crashSound.play().catch(e => console.log("Crash sound play failed in gameOver:", e));
 
             if(score > bestScore) {
                 bestScore = score; localStorage.setItem('anshika_flappy_best', bestScore); bestScoreEl.innerText = bestScore;
@@ -380,10 +386,13 @@
             // Play Audio
             bgm.play().catch(e => console.log("BGM fail:", e));
             
-            // Prime Crash Sound (Mute, play, pause)
-            crashSound.muted = true;
+            // Prime Crash Sound (Mute, play, pause) - This helps it load on mobile/safari
+            // We set volume to 0 briefly instead of muted to avoid some iOS quirks
+            crashSound.volume = 0;
             crashSound.play().then(() => {
-                crashSound.pause(); crashSound.currentTime = 0; crashSound.muted = false;
+                crashSound.pause(); 
+                crashSound.currentTime = 0; 
+                crashSound.volume = 1.0; // Restore volume
             }).catch(e => console.log("Crash prime fail:", e));
 
             // Prime Video
