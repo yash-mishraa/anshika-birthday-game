@@ -456,16 +456,21 @@
             loopId = requestAnimationFrame(loop); 
         }
 
-        // --- GLOBAL AUDIO UNLOCKER ---
+// --- GLOBAL AUDIO UNLOCKER ---
         // This runs EXACTLY once on the very first touch/click anywhere on the screen
         function unlockAudio() {
             if(isAudioUnlocked) return;
             isAudioUnlocked = true;
             
             // 1. Start Background Music
+            bgm.muted = false; // Ensure unmuted
             bgm.play().then(() => {
                 console.log("Audio unlocked successfully");
-            }).catch(e => console.log("Audio unlock failed", e));
+            }).catch(e => {
+                console.log("Audio unlock failed", e);
+                // Try again after a short delay
+                setTimeout(() => bgm.play().catch(()=>{}), 100);
+            });
 
             // 2. Prime other sounds (mute, play, pause)
             crashSound.play().then(() => { crashSound.pause(); crashSound.currentTime=0; }).catch(()=>{});
