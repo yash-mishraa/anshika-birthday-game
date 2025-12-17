@@ -51,11 +51,11 @@
         /* Birthday Video Styling */
         #birthday-video {
             display: none; /* Hidden by default */
-            position: absolute;
+            position: fixed; /* Fixed ensures it covers viewport on mobile */
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             /* 'contain' ensures the whole video is seen without cropping */
             object-fit: contain; 
             z-index: 20;
@@ -140,7 +140,8 @@
 
     <!-- Video Element (Replaces the game over text) -->
     <!-- Ensure "anshikaaa.mp4" is in the same folder -->
-    <video id="birthday-video" src="anshikaaa.mp4" playsinline></video>
+    <!-- Added webkit-playsinline for better iOS support -->
+    <video id="birthday-video" src="anshikaaa.mp4" playsinline webkit-playsinline></video>
     <div id="replay-btn">Play Again</div>
 
     <canvas id="gameCanvas"></canvas>
