@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Happy Birthday Anshika!</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Pacifico&display=swap');
+        /* Imported: Fredoka (Game), Pacifico (Headings), Press Start 2P (Timer), Special Elite (Suspense) */
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Pacifico&family=Press+Start+2P&family=Special+Elite&display=swap');
 
         html, body {
             width: 100%;
@@ -26,9 +27,42 @@
             background: linear-gradient(to bottom, #87CEEB, #E0F6FF); 
         }
 
-        /* Hidden assets */
-        #assets {
-            display: none;
+        /* --- LOCK SCREEN STYLES --- */
+        #lock-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000000; /* Full Black Dark */
+            z-index: 5000; /* Highest priority */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            transition: opacity 1s ease-out;
+        }
+
+        #lock-message {
+            font-family: 'Special Elite', cursive; /* Suspicious Typewriter Font */
+            font-size: 2rem;
+            color: #ffffff;
+            margin-bottom: 40px;
+            letter-spacing: 1px;
+            text-align: center;
+            padding: 0 20px;
+            opacity: 0.9;
+        }
+
+        #timer {
+            font-family: 'Press Start 2P', cursive; /* Minecraft/Pixel Font */
+            font-size: 1.8rem; /* Adjusted for pixel font width */
+            color: #00ff00; /* Retro bright green for contrast */
+            text-shadow: 4px 4px 0px #003300; /* 3D Pixel shadow */
+            line-height: 1.5;
+            text-align: center;
+            margin-top: 20px;
         }
 
         /* Overlay for UI messages */
@@ -144,10 +178,18 @@
             h1 { font-size: 2.5rem; }
             p { font-size: 1.2rem; }
             .best-score-display { font-size: 1.2rem; }
+            #timer { font-size: 1.2rem; line-height: 2; } /* Smaller timer on mobile to fit screen */
+            #lock-message { font-size: 1.2rem; margin-bottom: 30px; }
         }
     </style>
 </head>
 <body>
+
+    <!-- LOCK SCREEN -->
+    <div id="lock-screen">
+        <div id="lock-message">SOMETHING SPECIAL AWAITS...</div>
+        <div id="timer">00d 00h 00m 00s</div>
+    </div>
 
     <!-- Persistent Background Music -->
     <!-- Added id, preload, and autoplay to try forcing audio on load -->
@@ -188,17 +230,21 @@
         const videoLoader = document.getElementById('video-loader');
         const bgm = document.getElementById('bgm');
         const crashSound = document.getElementById('crash-sound');
+        
+        // Lock Screen Elements
+        const lockScreen = document.getElementById('lock-screen');
+        const timerEl = document.getElementById('timer');
 
         // --- VOLUME SETTINGS ---
-        bgm.volume = 0.6; // Reduced by 40% (0.6)
-        crashSound.volume = 1.0; // Keep crash sound loud
+        bgm.volume = 0.6; 
+        crashSound.volume = 1.0; 
 
         const birdImageSource = "anshika.jpg";
         const birdImg = new Image();
         birdImg.src = birdImageSource;
         birdImg.onerror = () => { console.log("Image failed to load:", birdImageSource); };
 
-        let gameState = 'START'; 
+        let gameState = 'LOCKED'; // Start as LOCKED
         let frames = 0;
         let score = 0;
         let bestScore = localStorage.getItem('anshika_flappy_best') || 0;
@@ -207,13 +253,77 @@
         let speed = 2.5; 
         let gravity = 0.25;
         let jumpStrength = 6.5; 
-        let loopId = null; // To manage the game loop
-        let isAudioUnlocked = false; // Flag for mobile audio
+        let loopId = null; 
+        let isAudioUnlocked = false; 
+
+        // --- TIMER LOGIC ---
+        // Target Date: December 22, 2025 at 00:00:00 IST
+        // IST is UTC +5:30
+        const targetDate = new Date("2025-12-22T00:00:00+05:30").getTime();
+
+        function updateTimer() {
+            const now = new Date().getTime();
+            const distance = targetDate - now;
+
+            if (distance < 0) {
+                // Unlock
+                unlockSite();
+                return;
+            }
+
+            // Calculations
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            // Formatting with leading zeros
+            const d = days < 10 ? "0" + days : days;
+            const h = hours < 10 ? "0" + hours : hours;
+            const m = minutes < 10 ? "0" + minutes : minutes;
+            const s = seconds < 10 ? "0" + seconds : seconds;
+
+            // Timer Display Format
+            // Adding line breaks for mobile readability if needed, or keeping one line
+            if(window.innerWidth < 600) {
+                // Stack on mobile
+                timerEl.innerHTML = `${d}D ${h}H<br>${m}M ${s}S`;
+            } else {
+                timerEl.innerText = `${d}D ${h}H ${m}M ${s}S`;
+            }
+        }
+
+        function unlockSite() {
+            // If already unlocked, do nothing
+            if (gameState !== 'LOCKED') return;
+
+            // Fade out lock screen
+            lockScreen.style.opacity = '0';
+            setTimeout(() => {
+                lockScreen.style.display = 'none';
+            }, 1000);
+
+            // Change state to allow game start
+            gameState = 'START';
+            
+            // Try to autoplay music if unlocked naturally
+            var promise = bgm.play();
+            if(promise !== undefined) {
+                promise.catch(e => { /* Autoplay blocked, wait for tap */ });
+            }
+        }
+
+        // Run timer every second
+        const timerInterval = setInterval(updateTimer, 1000);
+        // Run once immediately
+        updateTimer();
+
 
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             ground.y = canvas.height - 50; 
+            updateTimer(); // Force update on resize to fix layout
         }
         window.addEventListener('resize', resize);
 
@@ -349,19 +459,18 @@
             scoreEl.style.display = 'none'; 
             loop(); 
 
-            // Attempt to autoplay audio on load
-            var promise = bgm.play();
-            if (promise !== undefined) {
-                promise.then(_ => {
-                    isAudioUnlocked = true;
-                    console.log("Autoplay success");
-                }).catch(error => {
-                    console.log("Autoplay prevented. Waiting for interaction.");
-                });
+            // Initial state check for lock
+            const now = new Date().getTime();
+            if (now >= targetDate) {
+                 unlockSite();
+            } else {
+                // Keep it locked
+                gameState = 'LOCKED';
             }
         }
 
         function startGame() {
+            if (gameState === 'LOCKED') return; // Do not start if locked
             if (gameState === 'PLAYING') return;
             gameState = 'PLAYING';
             
@@ -381,7 +490,7 @@
             currentBgIndex = Math.floor(Math.random() * bgColors.length);
             bird.reset(); pipes.reset(); frames = 0; bird.jump();
             
-            if(!loopId) loop(); // Restart loop if stopped
+            if(!loopId) loop(); 
         }
 
         function gameOver() {
@@ -398,27 +507,21 @@
                 bestScore = score; localStorage.setItem('anshika_flappy_best', bestScore); bestScoreEl.innerText = bestScore;
             }
             
-            // VIDEO HANDLING OPTIMIZATION
-            // 1. Show loader
+            // VIDEO HANDLING
             videoLoader.style.display = 'block';
             birthdayVideo.style.display = 'block';
-            
-            // 2. Hide Canvas to save resources (Fixes lag)
             canvas.style.display = 'none';
             
-            // 3. Stop Game Loop
             if(loopId) {
                 cancelAnimationFrame(loopId);
                 loopId = null;
             }
 
-            // 4. Play Video
             birthdayVideo.muted = false; 
             var playPromise = birthdayVideo.play();
             
             if (playPromise !== undefined) {
                 playPromise.then(_ => {
-                    // Playback started
                     videoLoader.style.display = 'none';
                 })
                 .catch(error => {
@@ -427,7 +530,6 @@
                 });
             }
             
-            // Show replay button shortly after
             setTimeout(() => { 
                 replayBtn.style.display = 'block'; 
             }, 2000);
@@ -456,36 +558,24 @@
             loopId = requestAnimationFrame(loop); 
         }
 
-// --- GLOBAL AUDIO UNLOCKER ---
-        // This runs EXACTLY once on the very first touch/click anywhere on the screen
         function unlockAudio() {
             if(isAudioUnlocked) return;
             isAudioUnlocked = true;
             
-            // 1. Start Background Music
-            bgm.muted = false; // Ensure unmuted
             bgm.play().then(() => {
                 console.log("Audio unlocked successfully");
-            }).catch(e => {
-                console.log("Audio unlock failed", e);
-                // Try again after a short delay
-                setTimeout(() => bgm.play().catch(()=>{}), 100);
-            });
+            }).catch(e => console.log("Audio unlock failed", e));
 
-            // 2. Prime other sounds (mute, play, pause)
             crashSound.play().then(() => { crashSound.pause(); crashSound.currentTime=0; }).catch(()=>{});
             birthdayVideo.play().then(() => { birthdayVideo.pause(); birthdayVideo.currentTime=0; }).catch(()=>{});
         }
 
-        // --- INPUT HANDLING ---
-
         function handleInput(e) {
-            // If clicking replay button, ignore this handler (it has its own)
-            if (e.target === replayBtn) return;
+            if (gameState === 'LOCKED') return; // No input if locked
 
+            if (e.target === replayBtn) return;
             if (e.type === 'touchstart') e.preventDefault();
             
-            // Attempt to unlock audio on interaction
             unlockAudio();
 
             if (gameState === 'START') {
@@ -495,18 +585,16 @@
             }
         }
 
-        // Button Listener - Using touchend for reliability
         function handleReplay(e) {
             e.stopPropagation();
             e.preventDefault();
-            unlockAudio(); // Just in case
+            unlockAudio(); 
             startGame();
         }
         
         replayBtn.addEventListener('touchend', handleReplay);
         replayBtn.addEventListener('click', handleReplay);
 
-        // Global Listeners
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space') {
                 if(gameState === 'GAMEOVER' && replayBtn.style.display === 'block') {
@@ -523,9 +611,8 @@
         
         window.addEventListener('touchstart', handleInput, {passive: false});
         
-        // DEDICATED MOBILE AUDIO UNLOCKER (Fixes the variable name bug)
         window.addEventListener('touchstart', function() {
-            if (bgm.paused) {
+            if (bgm.paused && gameState !== 'LOCKED') {
                 unlockAudio();
             }
         }, { once: true });
